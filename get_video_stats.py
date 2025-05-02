@@ -1,0 +1,107 @@
+import os
+import pandas as pd
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from datetime import datetime
+
+# Define the scopes
+SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
+
+def authenticate_youtube():
+    """Authenticate and return the YouTube API client."""
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    flow = InstalledAppFlow.from_client_secrets_file("client_secret.json", SCOPES)
+    credentials = flow.run_local_server(port=0)
+    return build("youtube", "v3", credentials=credentials)
+
+def get_channel_stats(youtube):
+    """Fetch channel statistics."""
+    response = youtube.channels().list(part="snippet,statistics", mine=True).execute()
+    items = response.get("items", [])
+    if not items:
+        print("No channel data found.")
+        return None
+    channel = items[0]
+    data = {
+        "Day": datetime.now().strftime("%Y-%m-%d"),
+        "Channel Title": channel["snippet"]["title"],
+        "Subscribers": channel["statistics"].get("subscriberCount"),
+        "Total Views": channel["statistics"].get("viewCount"),
+        "Total Videos": channel["statistics"].get("videoCount"),
+        "Description": channel["snippet"].get("description"),
+        "Published At": channel["snippet"].get("publishedAt")
+    }
+    return data
+
+def get_uploads_playlist_id(youtube):
+    """Fetch the uploads playlist ID."""
+    response = youtube.channels().list(part="contentDetails", mine=True).execute()
+    items = response.get("items", [])
+    if not items:
+        print("No channel content details found.")
+        return None
+    return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+def get_video_ids(youtube, playlist_id):
+    """Fetch video IDs from the uploads playlist."""
+    video_ids = []
+    next_page_token = None
+    while True:
+        response = youtube.playlistItems().list(
+            part="contentDetails",
+            playlistId=playlist_id,
+            maxResults=50,
+            pageToken=next_page_token
+        ).execute()
+        items = response.get("items", [])
+        for item in items:
+            video_ids.append(item["contentDetails"]["videoId"])
+        next_page_token = response.get("nextPageToken")
+        if not next_page_token:
+            break
+    return video_ids
+
+def get_video_stats(youtube, video_ids):
+    """Fetch statistics for each video."""
+    stats = []
+    for i in range(0, len(video_ids), 50):
+        response = youtube.videos().list(
+            part="snippet,statistics",
+            id=",".join(video_ids[i:i+50])
+        ).execute()
+        items = response.get("items", [])
+        for item in items:
+            stats.append({
+                "Day": datetime.now().strftime("%Y-%m-%d"),
+                "Video ID": item["id"],
+                "Title": item["snippet"]["title"],
+                "Published At": item["snippet"]["publishedAt"],
+                "Views": item["statistics"].get("viewCount"),
+                "Likes": item["statistics"].get("likeCount"),
+                "Comments": item["statistics"].get("commentCount")
+            })
+    return stats
+
+def save_to_csv(data, filename):
+    """Save data to CSV, appending if file exists."""
+    df = pd.DataFrame(data)
+    if os.path.exists(filename):
+        df.to_csv(filename, mode='a', header=False, index=False)
+    else:
+        df.to_csv(filename, mode='w', header=True, index=False)
+    print(f"Data saved to {filename}")
+
+def main():
+    youtube = authenticate_youtube()
+    channel_stats = get_channel_stats(youtube)
+    if channel_stats:
+        save_to_csv([channel_stats], "channel_stats.csv")
+    playlist_id = get_uploads_playlist_id(youtube)
+    if playlist_id:
+        video_ids = get_video_ids(youtube, playlist_id)
+        video_stats = get_video_stats(youtube, video_ids)
+        if video_stats:
+            save_to_csv(video_stats, "video_stats.csv")
+
+if __name__ == "__main__":
+    main()
