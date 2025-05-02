@@ -30,4 +30,4 @@ python get_video_stats.py
 ```
 python get_channel_stats.py
 ```
-Follow the authentication prompt to fetch your YouTube data. The data will be saved in csv format. If you already have fetched data once, running the script again will not delete the previous version, rather add new rows with updated data.
+Follow the authentication prompt to fetch your YouTube data. The data will be saved in csv format. If you already have fetched data once, running the script again will not delete the previous version, rather add new rows with updated data. Example output files are added to the project in csv format.
