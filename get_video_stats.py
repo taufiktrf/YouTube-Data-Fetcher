@@ -14,25 +14,6 @@ def authenticate_youtube():
     credentials = flow.run_local_server(port=0)
     return build("youtube", "v3", credentials=credentials)
 
-def get_channel_stats(youtube):
-    """Fetch channel statistics."""
-    response = youtube.channels().list(part="snippet,statistics", mine=True).execute()
-    items = response.get("items", [])
-    if not items:
-        print("No channel data found.")
-        return None
-    channel = items[0]
-    data = {
-        "Day": datetime.now().strftime("%Y-%m-%d"),
-        "Channel Title": channel["snippet"]["title"],
-        "Subscribers": channel["statistics"].get("subscriberCount"),
-        "Total Views": channel["statistics"].get("viewCount"),
-        "Total Videos": channel["statistics"].get("videoCount"),
-        "Description": channel["snippet"].get("description"),
-        "Published At": channel["snippet"].get("publishedAt")
-    }
-    return data
-
 def get_uploads_playlist_id(youtube):
     """Fetch the uploads playlist ID."""
     response = youtube.channels().list(part="contentDetails", mine=True).execute()
@@ -93,9 +74,6 @@ def save_to_csv(data, filename):
 
 def main():
     youtube = authenticate_youtube()
-    channel_stats = get_channel_stats(youtube)
-    if channel_stats:
-        save_to_csv([channel_stats], "channel_stats.csv")
     playlist_id = get_uploads_playlist_id(youtube)
     if playlist_id:
         video_ids = get_video_ids(youtube, playlist_id)
