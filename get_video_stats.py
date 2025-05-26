@@ -3,16 +3,34 @@ import pandas as pd
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from datetime import datetime
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 # Define the scopes
 SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
 
+
+
 def authenticate_youtube():
     """Authenticate and return the YouTube API client."""
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-    flow = InstalledAppFlow.from_client_secrets_file("client_secret.json", SCOPES)
-    credentials = flow.run_local_server(port=0)
-    return build("youtube", "v3", credentials=credentials)
+
+    creds = None
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("client_secret.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save credentials for next run
+        with open("token.json", "w") as token_file:
+            token_file.write(creds.to_json())
+
+    return build("youtube", "v3", credentials=creds)
+
 
 def get_uploads_playlist_id(youtube):
     """Fetch the uploads playlist ID."""
